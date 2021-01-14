@@ -2,6 +2,7 @@ from typing import List
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import requests
+import pandas as pd
 
 import util
 from IPython import embed
@@ -13,7 +14,7 @@ def get_soup(url):
 
 
 def get_card_links(soup):
-    cards = {card.h2.get_text(): card.h2.a["href"] for card in soup.find_all(
+    cards = {card.h2.a["href"] for card in soup.find_all(
         "article", {"class": "ads__unit"})}
     return cards
 
@@ -46,7 +47,7 @@ def get_all_page_links(soup, start_side: int, base_url) -> List[str]:
 
 
 def get_data(link):
-    soup = get_soup("https://www.finn.no/realestate/homes/ad.html?finnkode=204438115").find(
+    soup = get_soup(link).find(
         "main", {"class": "pageholder"})
 
     data = {
@@ -54,29 +55,31 @@ def get_data(link):
     }
     # header
     header = soup.find("h1")
-    data["header"] = header.get_text()
+    data["header"] = header.get_text(strip=True)
 
     # location
     location = header.find_next_siblings('p')[0]
-    data["location"] = location.get_text()
+    data["location"] = location.get_text(strip=True)
 
-    # panel info
     panel = location.find_next("div", {"class": "panel"})
+
+    # price info
     price = panel.find_all("span")[1]
-    data["price"] = price.get_text()
+    data["price"] = util.extract_int(price.get_text(strip=True))
 
     # type of realestate
     kw = "definition-list definition-list--cols1to2"
     about_table = soup.find("dl", {"class": kw})
-    data["about"] = {dt.get_text(): dt.find_next("dd").get_text()
+    data["about"] = {dt.get_text(strip=True): dt.find_next("dd").get_text(strip=True)
                      for dt in about_table.find_all("dt")}
 
     # Definition list
+    data["price_info"] = {}
     dls = panel.find_all("dl")
     for dl in dls:
-        pass
-
-    data["definition_list"]
+        for dt in dl.find_all("dt"):
+            data["price_info"][dt.get_text(strip=True)] = dt.find_next(
+                "dd").get_text(strip=True)
 
     return data
 
@@ -87,10 +90,6 @@ def get_data(link):
 -> get all pages
 -> get all cards
 ->
-
-python, c/c++, java, Rust, go, kotlin, R, matlab, (p)SQl
-
-
 """
 a = [1]
 
@@ -103,31 +102,38 @@ if __name__ == "__main__":
 
     # get all pages
     page_links = get_all_page_links(
-        index_soup, start_side=0, base_url="https://www.finn.no/realestate/homes/search.html")
+        index_soup, start_side=0, base_url=search_url)
 
     # get all cards
-    card_links = []
+    card_links = set()
     for page_link in page_links:
         for card_link in get_card_links(get_soup(search_url + page_link)):
             if "http" in card_link:
-                card_links.append(card_link)
+                card_links.add(card_link)
             # making all links absolute,because not all was.
             else:
-                card_links.append("https://www.finn.no" + card_link)
+                card_links.add("https://www.finn.no" + card_link)
             # embed()
 
     # get data from cards
-    card_data = []
+    cards_data = []
     N = len(card_links)
     N_failed = 0
     for i, card_link in enumerate(card_links):
         try:
-            card_data.append(
+            cards_data.append(
                 get_data(card_link)
             )
         except AttributeError as e:
             print(f"url: {card_link}\n{e}")
             print(e)
             N_failed += 1
-        # p = (i/N)*100
         print(f"{(i/N)*100}. {i} out of {N}, {N_failed=}")
+
+    # df
+    df = pd.DataFrame.from_dict(cards_data)
+
+    # parsing
+
+    # write csv
+    df.to_csv("realestate.csv")
