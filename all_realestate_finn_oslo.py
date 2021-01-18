@@ -70,16 +70,22 @@ def get_data(link):
     # type of realestate
     kw = "definition-list definition-list--cols1to2"
     about_table = soup.find("dl", {"class": kw})
-    data["about"] = {dt.get_text(strip=True): dt.find_next("dd").get_text(strip=True)
-                     for dt in about_table.find_all("dt")}
+    data.update({dt.get_text(strip=True): dt.find_next("dd").get_text(strip=True)
+                 for dt in about_table.find_all("dt")})
 
     # Definition list
-    data["price_info"] = {}
+    # data["price_info"] = {}
     dls = panel.find_all("dl")
     for dl in dls:
         for dt in dl.find_all("dt"):
-            data["price_info"][dt.get_text(strip=True)] = dt.find_next(
+            data[dt.get_text(strip=True)] = dt.find_next(
                 "dd").get_text(strip=True)
+
+    # Cleaning of data
+    if "Bruksareal" in data:
+        data["Bruksareal"] = util.extract_int(data['Bruksareal'][:-1])
+    if "Totalpris" in data:
+        data["Totalpris"] = util.extract_int(data["Totalpris"])
 
     return data
 
@@ -132,8 +138,6 @@ if __name__ == "__main__":
 
     # df
     df = pd.DataFrame.from_dict(cards_data)
-
-    # parsing
 
     # write csv
     df.to_csv("realestate.csv")
