@@ -7,6 +7,8 @@ from . import util
 
 from IPython import embed
 
+LOG_LOCATION = "py_pkg/log/all_realestate_oslo_log.txt"
+
 
 def get_card_links(soup):
     cards = {card.h2.a["href"] for card in soup.find_all(
@@ -136,8 +138,11 @@ def main(location_code: str = None, out: str = f"out/{date.today()}_realestate",
     for i, card_link in enumerate(card_links):
         if "nybyg" in card_link:
             msg = f"Nybygg: url: {card_link}"
-            with open("log/all_realestate_oslo_log.txt", "a+") as fp:
-                fp.write(msg + "\n")
+            try:
+                with open(LOG_LOCATION, "a+") as fp:
+                    fp.write(msg + "\n")
+            except FileNotFoundError as e:
+                embed(header=f"File not found: {e}")
             N_failed += 1
             continue
         try:
@@ -146,7 +151,7 @@ def main(location_code: str = None, out: str = f"out/{date.today()}_realestate",
             )
         except AttributeError as e:
             msg = f"url: {card_link}\n{e}"
-            with open("log/all_realestate_oslo_log.txt", "a+") as fp:
+            with open(LOG_LOCATION, "a+") as fp:
                 fp.write(msg + "\n")
             print(msg)
             N_failed += 1
@@ -157,7 +162,7 @@ def main(location_code: str = None, out: str = f"out/{date.today()}_realestate",
 
     # write csv
     # updating the base one
-    df.to_csv("out/realestate.csv")
+    df.to_csv("py_pkg/out/realestate.csv")
     # wrting one new with specified name, default is with date.
     df.to_csv(out + ".csv")
     return df

@@ -1,0 +1,32 @@
+[
+  {
+    "Name": "house1",
+    "URL": "finn.no/1",
+    "price": 1000,
+    "price2": 1200,
+    "size": 12,
+    "desc": [
+      "good",
+      {
+        "desc": "new",
+        "age": 10
+      }
+    ]
+
+  },
+  {
+    "Name": "house2",
+    "URL": "finn.no/2",
+    "price": 100,
+    "price2": 1100,
+    "size": 11,
+    "desc": [
+      "bad",
+      {
+        "desc": "new",
+        "age": 20
+      }
+    ]
+
+  }
+]
