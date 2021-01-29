@@ -10,6 +10,20 @@ import (
 	"strconv"
 )
 
+type printProgress struct {
+	N, Common int
+	Threshold float64
+	Msg string
+}
+
+func (p printProgress) printP (i int){
+	if float64(i) > p.Threshold {
+		progress := float64(p.N) / float64(p.Common)
+		p.Threshold += progress
+		fmt.Printf( "%s %f %% done \n", p.Msg, progress)
+	}
+}
+
 func PrintStingArr(arr []*string) {
 	for i, v := range arr {
 		fmt.Printf("%d: %s\n", i, *v)
@@ -48,4 +62,11 @@ func readJsonArray(filePath string) []interface{} {
 	json.Unmarshal([]byte(byteVal), &r)
 	fp.Close()
 	return r
+}
+
+func logIfErr(e  error, msg string) bool {
+	if e != nil {
+		log.Fatal(msg + "\n",e)
+	}
+	return e != nil
 }

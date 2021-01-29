@@ -8,20 +8,59 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var FINN string = "https://www.finn.no"
 var FINN_REALESTATE_INDEX string = FINN + "/realestate/homes/search.html"
 
 type Realest struct {
-	Title, Address, URL string
-	ID, Price           int
-	Info                map[string]string
+	Title, Address, URL, Date string
+	ID, Price                 int
+	Info                      map[string]string
 }
 
-func realests2csv(reals []Realest) {
-
+func (left Realest) RightUpdates(right Realest) (Realest, bool) {
+	// If diff keep left data
+	updates := Realest{}
+	isUpdated := false
+	if left.Title != right.Title {
+		updates.Title = right.Title
+		isUpdated = true
+	}
+	if left.Address != right.Address {
+		updates.Address = right.Address
+		isUpdated = true
+	}
+	if left.URL != right.URL {
+		updates.URL = right.URL
+		isUpdated = true
+	}
+	if left.Date != right.Date {
+		updates.Date = right.Date
+		isUpdated = true
+	}
+	if left.ID != right.ID {
+		updates.ID = right.ID
+		isUpdated = true
+	}
+	if left.Price != right.Price {
+		updates.Price = right.Price
+		isUpdated = true
+	}
+	for rightKey, rightVal := range right.Info {
+		leftVal, ok := left.Info[rightKey]
+		if !ok || leftVal != rightVal {
+			updates.Info[rightKey] = rightVal
+			isUpdated = true
+		}
+	}
+	return updates, isUpdated
 }
+func (left Realest) LeftUpdates(right Realest) (Realest, bool) {
+	return right.RightUpdates(left)
+}
+
 
 func getRealestateCardUrls(link string) []*string {
 	c := colly.NewCollector(
@@ -41,14 +80,15 @@ func getRealestateCardUrls(link string) []*string {
 		}
 	})
 
-	c.Visit("https://www.finn.no/realestate/homes/search.html?sort=PUBLISHED_DESC")
+	c.Visit(link)
 
 	return realestCards
 }
 
-func getIndexPages(link string, startPage int) []*string {
+func getIndexPages_(link string, startPage int) []*string {
 	indexPages := []*string{}
-	re, _ := regexp.Compile(`\d{1,2}`)
+	reFindPage, _ := regexp.Compile(`(page=)\d{1,2}`)
+	reRemovePageStr, _ := regexp.Compile(`(page=)`)
 	n := 0
 
 	c := colly.NewCollector(
@@ -58,9 +98,12 @@ func getIndexPages(link string, startPage int) []*string {
 
 	c.OnHTML("[class='pagination__page button button--pill']", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
-		x := re.FindString(href)
-		pageNumber, _ := strconv.Atoi(x)
-		if (pageNumber >= startPage) || (x == "") {
+		pageNumber := 1
+		if strings.Contains(href, "page") {
+			pageNumberStr := reRemovePageStr.ReplaceAllString(reFindPage.FindString(href), "")
+			pageNumber, _ = strconv.Atoi(pageNumberStr)
+		}
+		if pageNumber > startPage {
 			indexPages = append(indexPages, &href)
 			n++
 		}
@@ -70,13 +113,23 @@ func getIndexPages(link string, startPage int) []*string {
 	if n > 0 {
 		newLink := FINN_REALESTATE_INDEX + *indexPages[n-1]
 		var newStartPage = startPage + n
-		return append(indexPages, getIndexPages(newLink, newStartPage)...)
+		return append(indexPages, getIndexPages_(newLink, newStartPage)...)
 	}
 	return indexPages
 }
 
+func getIndexPages(link string) []*string {
+	return getIndexPages_(link, 0)
+}
+
 func getRealestateData(link string) *Realest {
+	//Title, Address, URL string
+	//ID, Price           int
+	//Info                map[string]string
+	// TODO : not keys ending with "."
 	var r Realest
+	var e error
+
 	var price string
 	doc, err := goquery.NewDocument(link)
 	if err != nil {
@@ -84,9 +137,23 @@ func getRealestateData(link string) *Realest {
 	}
 	mainArea := doc.Find("div.grid")
 	title := mainArea.Find("h1")
+	// Title
 	r.Title = title.Text()
+	// Address
 	r.Address = title.Next().Text()
+	// URL
 	r.URL = link
+	// Date
+	// TODO : Change to only date
+	r.Date = time.Now().String()
+	// ID
+	idRe, e := regexp.Compile(`(\d{8,9})$`)
+	logIfErr(e, "")
+	r.ID, e = strconv.Atoi(idRe.FindString(link))
+	if logIfErr(e, "r.ID = strconv.Atoi(idRe.FindString(link)), failed on link: "+link) {
+		r.ID = 0
+		log.Printf("")
+	}
 	// Get price
 	mainArea.Find("span").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		msg := s.Text()
@@ -98,6 +165,7 @@ func getRealestateData(link string) *Realest {
 		}
 		return true
 	})
+	// Price
 	r.Price, _ = Ascii2Int(price)
 
 	// get all dls/Info
@@ -141,25 +209,37 @@ func getAllLocations(link string) map[string]string {
 
 func main() {
 
-	//pages := getIndexPages(FINN_REALESTATE_INDEX, 1)
-	////fmt.Println("pages: ")
-	////PrintStingArr(pages)
-	//
-	//var cards []*string
-	//for _, link := range pages {
-	//	x := getRealestateCardUrls(*link)
-	//	cards = append(cards, x...)
-	//
-	//}
-	//fmt.Println("cards")
-	//PrintStingArr(cards)
-	//
-	//r := getRealestateData("https://www.finn.no/realestate/homes/ad.html?finnkode=205519251")
-	//log.Println("Title:", r.Title)
-	//log.Println("Addr:", r.Address)
-	//log.Println("Price :", r.Price)
-	//log.Println("Info:", r.Info)
+	// Find all locations
+	log.Println("Finding all locations")
+	locationCodes := getAllLocations(FINN_REALESTATE_INDEX)
+	locationString := "location="
 
-	fmt.Println(getAllLocations("https://www.finn.no/realestate/homes/search.html?sort=PUBLISHED_DESC"))
+	// Find all pages per location
+	log.Println("Finding all pages per location. #LocationCodes:", len(locationCodes))
+	var link string
+	pages := []*string{}
+	for location, locationCode := range locationCodes {
+		fmt.Println("Location:", location)
+		link = FINN_REALESTATE_INDEX + "?" + locationString + locationCode
+		pages = append(pages, getIndexPages(link)...)
+	}
+	// Find all listings per page
+	log.Println("Finding all listings per page. #Pages:", len(pages))
+	realestateLinks := []*string{}
+	for ind, page := range pages {
+		fmt.Printf("Page: %d of %d \n", ind, len(pages))
+		realestateLinks = append(realestateLinks, getRealestateCardUrls(FINN_REALESTATE_INDEX+*page)...)
+	}
+	// Find data from all listings
+	log.Println("Finding all data for all listings. #RealestateLinks:", len(realestateLinks))
+	realestates := []interface{}{Realest{}}
+	for ind, link := range realestateLinks {
+		fmt.Printf("realestateLinks: %d of %d\n", ind, len(realestateLinks))
+		realestates = append(realestates, getRealestateData(*link))
+	}
+	// Store data
+	log.Println("Storing data. #Realestates:", len(realestates))
+	collection := getFinnRealestateCollection()
+	insertManyRealestate(collection, realestates)
 
 }
