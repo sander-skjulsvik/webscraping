@@ -33,7 +33,7 @@ func UpdateManyRealestate(c *mongo.Collection, realestates map[int]*Realest) {
 		if oldBson, exist := isInDb(c, *realest); exist {
 			// if realest exists in db, update if different
 			oldBson.Decode(&old)
-			if old.Updates[time.Now().String()], isUpdated = realest.RightUpdates(old); isUpdated  {
+			if old.Updates[time.Now().String()], isUpdated = realest.RightUpdates(old); isUpdated {
 				// Insert update
 				c.UpdateOne(context.TODO(), oldBson, old)
 
@@ -45,7 +45,6 @@ func UpdateManyRealestate(c *mongo.Collection, realestates map[int]*Realest) {
 		}
 	}
 }
-
 
 func getFinnRealestateCollection() *mongo.Collection {
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")

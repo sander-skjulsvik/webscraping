@@ -19,8 +19,8 @@ type Realest struct {
 	Title, Address, URL, DateTime string
 	ID, Price                     int
 	Info                          map[string]string
-	//Active                        bool
 	Updates                       map[string]Realest // datetime string
+	//Active                        bool
 }
 
 //type RealestKey struct {
@@ -86,7 +86,6 @@ func getRealestateCardUrls(link string) []*string {
 			realestCards = append(realestCards, &r)
 		}
 	})
-
 
 	if err := c.Visit(link); err != nil {
 		log.Printf("Link: %s, failed. err: %s\n", link, err)
@@ -164,7 +163,6 @@ func getRealestateData(link string) *Realest {
 	logIfErr(e, "")
 	r.ID, e = strconv.Atoi(idRe.FindString(link))
 	logIfErr(e, "r.ID = strconv.Atoi(idRe.FindString(link)), failed on link: "+link)
-
 
 	// Get price
 	mainArea.Find("span").EachWithBreak(func(i int, s *goquery.Selection) bool {
