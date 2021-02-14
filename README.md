@@ -2,13 +2,17 @@
 
 two packages, one in python using bf4 but not maintained, and a go pkg which is tried and works although is not formally tested.
 
+## py_pkg
+
+Not maintained.
+
 ## go_pkg
 
 This is a go program for scraping realestate data of finn. The pro gram takes currently no input to run, so it just doing the same thing every time. Which is reading all realestae on finn (not all, but almost) and updates the db.
 
 The pkg is using goquery and colly for scraping the finn pages.'
 
-## How does it work.
+### How does it work.
 
 In finn.go the main logic is written, and the main data flow is controlled by the function UpdateFinnDb.
 
@@ -23,15 +27,15 @@ TLDR: Finn realestate index -> Location links -> Pages links -> Realestate listi
 7. Then the realestate instances are checked against the db. It checks if the realestate is already in the db. If so it checks for differences. If there is a difference the difference will be added to the realestate updates map, with the time as key. If the realestate is not in the db it is added. 
 
 
-## To run:
+### To run:
 
 The main function is in runHere.go. It also assumes a mongo db @ mongodb://localhost:27017.
 
-## Finn.go
+### Finn.go
 
 The finn.go file cont
 
-## DB.
+### DB.
 
 The db configuration and functions are located in db.go. There you can specify the mongodb uri. 
 
