@@ -13,5 +13,5 @@ require (
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	go.mongodb.org/mongo-driver v1.4.5
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/appengine v1.6.7
 )

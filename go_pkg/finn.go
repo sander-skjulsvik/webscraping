@@ -2,26 +2,34 @@ package main
 
 import (
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/gocolly/colly"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/gocolly/colly"
 )
 
 var FINN string = "https://www.finn.no"
 var FINN_REALESTATE_INDEX string = FINN + "/realestate/homes/search.html"
 
 type Realest struct {
-	Title, Address, URL, Date string
-	ID, Price                 int
-	Info                      map[string]string
+	Title, Address, URL, DateTime string
+	ID, Price                     int
+	Info                          map[string]string
+	//Active                        bool
+	Updates                       map[string]Realest // datetime string
 }
 
+//type RealestKey struct {
+//	Title, Address string
+//	ID             int
+//}
+
 func (left Realest) RightUpdates(right Realest) (Realest, bool) {
-	// If diff keep left data
+	// If diff keep Left data
 	updates := Realest{}
 	isUpdated := false
 	if left.Title != right.Title {
@@ -36,10 +44,10 @@ func (left Realest) RightUpdates(right Realest) (Realest, bool) {
 		updates.URL = right.URL
 		isUpdated = true
 	}
-	if left.Date != right.Date {
-		updates.Date = right.Date
-		isUpdated = true
-	}
+	//if left.DateTime != right.DateTime {
+	//	updates.DateTime = right.DateTime
+	//	isUpdated = true
+	//}
 	if left.ID != right.ID {
 		updates.ID = right.ID
 		isUpdated = true
@@ -61,7 +69,6 @@ func (left Realest) LeftUpdates(right Realest) (Realest, bool) {
 	return right.RightUpdates(left)
 }
 
-
 func getRealestateCardUrls(link string) []*string {
 	c := colly.NewCollector(
 		colly.AllowedDomains("finn.no", "www.finn.no"),
@@ -80,13 +87,17 @@ func getRealestateCardUrls(link string) []*string {
 		}
 	})
 
-	c.Visit(link)
+
+	if err := c.Visit(link); err != nil {
+		log.Printf("Link: %s, failed. err: %s\n", link, err)
+	}
 
 	return realestCards
 }
 
 func getIndexPages_(link string, startPage int) []*string {
 	indexPages := []*string{}
+	var err error
 	reFindPage, _ := regexp.Compile(`(page=)\d{1,2}`)
 	reRemovePageStr, _ := regexp.Compile(`(page=)`)
 	n := 0
@@ -101,14 +112,18 @@ func getIndexPages_(link string, startPage int) []*string {
 		pageNumber := 1
 		if strings.Contains(href, "page") {
 			pageNumberStr := reRemovePageStr.ReplaceAllString(reFindPage.FindString(href), "")
-			pageNumber, _ = strconv.Atoi(pageNumberStr)
+			if pageNumber, err = strconv.Atoi(pageNumberStr); err != nil {
+				log.Printf(" getIndexPages_ failed to find page number in str: %s, from href: %s \n", pageNumberStr, href)
+			}
 		}
 		if pageNumber > startPage {
 			indexPages = append(indexPages, &href)
 			n++
 		}
 	})
-	c.Visit(link)
+	if err := c.Visit(link); err != nil {
+		log.Printf("getIndexPages_: failed to visit link: %s. err: %s \n", link, err)
+	}
 
 	if n > 0 {
 		newLink := FINN_REALESTATE_INDEX + *indexPages[n-1]
@@ -123,10 +138,7 @@ func getIndexPages(link string) []*string {
 }
 
 func getRealestateData(link string) *Realest {
-	//Title, Address, URL string
-	//ID, Price           int
-	//Info                map[string]string
-	// TODO : not keys ending with "."
+
 	var r Realest
 	var e error
 
@@ -143,17 +155,17 @@ func getRealestateData(link string) *Realest {
 	r.Address = title.Next().Text()
 	// URL
 	r.URL = link
-	// Date
-	// TODO : Change to only date
-	r.Date = time.Now().String()
+	// DateTime
+	r.DateTime = time.Now().String()
+	// Updates
+	r.Updates = make(map[string]Realest)
 	// ID
 	idRe, e := regexp.Compile(`(\d{8,9})$`)
 	logIfErr(e, "")
 	r.ID, e = strconv.Atoi(idRe.FindString(link))
-	if logIfErr(e, "r.ID = strconv.Atoi(idRe.FindString(link)), failed on link: "+link) {
-		r.ID = 0
-		log.Printf("")
-	}
+	logIfErr(e, "r.ID = strconv.Atoi(idRe.FindString(link)), failed on link: "+link)
+
+
 	// Get price
 	mainArea.Find("span").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		msg := s.Text()
@@ -171,7 +183,8 @@ func getRealestateData(link string) *Realest {
 	// get all dls/Info
 	r.Info = make(map[string]string)
 	mainArea.Find("dt").Each(func(i int, s *goquery.Selection) {
-		r.Info[s.Text()] = s.Next().Text()
+		// Adding data to key
+		r.Info[cleanKeysForMongoDb(s.Text())] = s.Next().Text()
 	})
 	return &r
 }
@@ -207,8 +220,13 @@ func getAllLocations(link string) map[string]string {
 	return locations
 }
 
-func main() {
+func addUpdateRealest(old Realest, new Realest) {
+	if updates, isDiff := old.RightUpdates(new); isDiff {
+		old.Updates[new.DateTime] = updates
+	}
+}
 
+func UpdateFinnDB() {
 	// Find all locations
 	log.Println("Finding all locations")
 	locationCodes := getAllLocations(FINN_REALESTATE_INDEX)
@@ -219,9 +237,10 @@ func main() {
 	var link string
 	pages := []*string{}
 	for location, locationCode := range locationCodes {
-		fmt.Println("Location:", location)
+		fmt.Print("Location:", location)
 		link = FINN_REALESTATE_INDEX + "?" + locationString + locationCode
 		pages = append(pages, getIndexPages(link)...)
+		fmt.Printf("(pages: %d)\n", len(pages))
 	}
 	// Find all listings per page
 	log.Println("Finding all listings per page. #Pages:", len(pages))
@@ -232,14 +251,29 @@ func main() {
 	}
 	// Find data from all listings
 	log.Println("Finding all data for all listings. #RealestateLinks:", len(realestateLinks))
-	realestates := []interface{}{Realest{}}
+	realestates := make(map[int]*Realest) // id -> realestate
+	var currentRealestate *Realest
+
 	for ind, link := range realestateLinks {
 		fmt.Printf("realestateLinks: %d of %d\n", ind, len(realestateLinks))
-		realestates = append(realestates, getRealestateData(*link))
+		currentRealestate = getRealestateData(*link)
+		if val, isIn := realestates[currentRealestate.ID]; isIn {
+			// If finn id is already added look for differences. If diff add to realest.updates.
+			log.Printf("Found duplicate in Find data from all listings. ID: %d \n ", currentRealestate.ID)
+			addUpdateRealest(*val, *currentRealestate)
+			realestates[currentRealestate.ID] = val
+		} else {
+			// else just add
+			realestates[currentRealestate.ID] = currentRealestate
+		}
+		//if ind > 200 {break}
 	}
+
 	// Store data
 	log.Println("Storing data. #Realestates:", len(realestates))
 	collection := getFinnRealestateCollection()
-	insertManyRealestate(collection, realestates)
-
+	// insert new,
+	// Update existing
+	UpdateManyRealestate(collection, realestates)
+	// Once not in the new listings mark as active: False?
 }
