@@ -1,16 +1,13 @@
 from typing import List
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse
-import requests
 import pandas as pd
+from datetime import date
 
-import util
+
+from . import util
+
 from IPython import embed
 
-
-def get_soup(url):
-    page = requests.get(url)
-    return BeautifulSoup(page.content, 'html.parser')
+LOG_LOCATION = "py_pkg/log/all_realestate_oslo_log.txt"
 
 
 def get_card_links(soup):
@@ -41,13 +38,13 @@ def get_all_page_links(soup, start_side: int, base_url) -> List[str]:
             pages.append(page["href"])
     if len(pages) == 0:
         return []
-    new_soup = get_soup(f"{base_url}{pages[-1]}")
+    new_soup = util.get_soup(f"{base_url}{pages[-1]}")
     return pages + get_all_page_links(
         new_soup, current_page, base_url)
 
 
 def get_data(link):
-    soup = get_soup(link).find(
+    soup = util.get_soup(link).find(
         "main", {"class": "pageholder"})
 
     data = {
@@ -90,49 +87,73 @@ def get_data(link):
     return data
 
 
-"""
+# get index
+BASE_URL = "https://www.finn.no"
+BASE_SEARCH_URL = f"{BASE_URL}/realestate/homes/search.html"
+SEARCH_STR: str = f"sort=PUBLISHED_DESC"
 
-- Get index
--> get all pages
--> get all cards
-->
-"""
-a = [1]
 
-if __name__ == "__main__":
+def main(location_code: str = None, out: str = f"out/{date.today()}_realestate", verbose=True) -> pd.DataFrame:
+
+    base_url = BASE_URL
+    search_url = BASE_SEARCH_URL
+    if location_code:
+        index_url = f"{BASE_SEARCH_URL}?location={location_code}&sort=PUBLISHED_DESC"
+        out += "_" + location_code
+    else:
+        index_url = f"{BASE_SEARCH_URL}?{SEARCH_STR}"
+
+    if verbose:
+        print(f"index: {index_url}")
+
     # get index
-    base_url = "https://www.finn.no"
-    search_url = f"{base_url}/realestate/homes/search.html"
-    index_url = f"{search_url}?location=0.20061&sort=PUBLISHED_DESC"
-    index_soup = get_soup(index_url)
+    index_soup = util.get_soup(index_url)
 
     # get all pages
     page_links = get_all_page_links(
         index_soup, start_side=0, base_url=search_url)
 
+    if verbose:
+        print(f"Number of pages: {len(page_links)}")
+
     # get all cards
-    card_links = set()
-    for page_link in page_links:
-        for card_link in get_card_links(get_soup(search_url + page_link)):
+    card_links = list()
+    for ind, page_link in enumerate(page_links):
+        r = get_card_links(util.get_soup(search_url + page_link))
+        for card_link in r:
             if "http" in card_link:
-                card_links.add(card_link)
+                card_links.append(card_link)
             # making all links absolute,because not all was.
             else:
-                card_links.add("https://www.finn.no" + card_link)
+                card_links.append("https://www.finn.no" + card_link)
             # embed()
+
+    if verbose:
+        print(f"Number of cards: {len(card_links)}")
 
     # get data from cards
     cards_data = []
     N = len(card_links)
     N_failed = 0
     for i, card_link in enumerate(card_links):
+        if "nybyg" in card_link:
+            msg = f"Nybygg: url: {card_link}"
+            try:
+                with open(LOG_LOCATION, "a+") as fp:
+                    fp.write(msg + "\n")
+            except FileNotFoundError as e:
+                embed(header=f"File not found: {e}")
+            N_failed += 1
+            continue
         try:
             cards_data.append(
                 get_data(card_link)
             )
         except AttributeError as e:
-            print(f"url: {card_link}\n{e}")
-            print(e)
+            msg = f"url: {card_link}\n{e}"
+            with open(LOG_LOCATION, "a+") as fp:
+                fp.write(msg + "\n")
+            print(msg)
             N_failed += 1
         print(f"{(i/N)*100}. {i} out of {N}, {N_failed=}")
 
@@ -140,4 +161,8 @@ if __name__ == "__main__":
     df = pd.DataFrame.from_dict(cards_data)
 
     # write csv
-    df.to_csv("realestate.csv")
+    # updating the base one
+    df.to_csv("py_pkg/out/realestate.csv")
+    # wrting one new with specified name, default is with date.
+    df.to_csv(out + ".csv")
+    return df
