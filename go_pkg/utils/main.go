@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"context"
@@ -69,21 +69,21 @@ func readJsonArray(filePath string) []interface{} {
 	return r
 }
 
-func logIfErr(e error, msg string) bool {
+func LogIfErr(e error, msg string) bool {
 	if e != nil {
 		log.Fatal(msg+"\n", e)
 	}
 	return e != nil
 }
 
-func logIfFatal(e error, msg string) bool {
+func LogIfFatal(e error, msg string) bool {
 	if e != nil {
 		log.Fatalf("%s %s", e)
 	}
 	return e != nil
 }
 
-func cleanKeysForMongoDb(key string) string {
+func CleanKeysForMongoDb(key string) string {
 	s := strings.Split(key, "")
 	// Remove "." in the end of keys.
 
