@@ -78,7 +78,7 @@ func LogIfErr(e error, msg string) bool {
 
 func LogIfFatal(e error, msg string) bool {
 	if e != nil {
-		log.Fatalf("%s %s", e)
+		log.Fatalf("%s %s\n", e, msg)
 	}
 	return e != nil
 }

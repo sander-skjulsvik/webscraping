@@ -121,7 +121,7 @@ func GetRealestateData(link string) db.Realestate {
 	r.Price, err = strconv.Atoi(price)
 	if err != nil {
 		r.Price = -1
-		log.Printf("Realestate: %s, could not convert price to int: %s. Setting price to -1", r.Address, price)
+		log.Printf("Realestate: %s, could not convert price to int: %s. Setting price to -1\n", r.Address, price)
 	}
 	// get all dls/Info
 	r.Info = make(map[string]string)

@@ -19,12 +19,12 @@ func getIndexes(startURL string, indexes chan<- string) {
 	// Find pages per location
 	log.Println("Finding pages per location. #LocationCodes:", len(locationCodes))
 	for location, locationCode := range locationCodes {
-		fmt.Print("Location:", location)
+		fmt.Println("Location:", location)
 		indexPages := GetIndexPages(FINN_REALESTATE_INDEX + "?" + locationString + locationCode)
 		for _, indexLink := range indexPages {
 			indexes <- *indexLink
 		}
-		log.Printf("#indexes +%d: %d ", len(indexPages), len(indexes))
+		log.Printf("#indexes +%d: %d\n", len(indexPages), len(indexes))
 	}
 }
 
@@ -53,8 +53,8 @@ func processRealestateLinks(realestateLinks <-chan string, realestateData chan<-
 		} else {
 			log.Printf("Skipping duplicate link: %s\n", link)
 		}
-		log.Printf("#realestateLinks -1: %d ", len(realestateLinks))
-		log.Printf("#realestateData +1: %d ", len(realestateData))
+		log.Printf("#realestateLinks -1: %d\n", len(realestateLinks))
+		log.Printf("#realestateData +1: %d\n", len(realestateData))
 	}
 }
 
@@ -66,7 +66,7 @@ func addRealestateDataToDB(realestateData <-chan db.Realestate) {
 	// Update existing
 	for realestate := range realestateData {
 		db.UpdateRealestate(collection, realestate)
-		log.Printf("#realestateData: %d ", len(realestateData))
+		log.Printf("#realestateData: %d\n", len(realestateData))
 	}
 	// Once not in the new listings mark as active: False?
 
